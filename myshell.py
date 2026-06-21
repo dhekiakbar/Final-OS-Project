@@ -2,7 +2,6 @@ import os
 from pathlib import Path
 from colorama import init, Fore, Back, Style
 
-# Initialize colorama (autoreset ensures colors reset after every print statement)
 init(autoreset=True)
 print(Fore.RED + "This text is red!")
 
