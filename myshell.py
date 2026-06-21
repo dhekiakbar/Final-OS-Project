@@ -1,15 +1,51 @@
 import os
+from pathlib import Path
+import shlex
 from colorama import init, Fore, Back, Style
 
 # Initialize colorama (autoreset ensures colors reset after every print statement)
 init(autoreset=True)
 print(Fore.RED + "This text is red!")
 
+def split_input(command):
+    result = []
+    current = ""
+    in_quote = False
+    quote_char = None
+
+    for c in command:
+        if c in ("'", '"'):
+            if in_quote and c == quote_char:
+                in_quote = False
+                quote_char = None
+            elif not in_quote:
+                in_quote = True
+                quote_char = c
+            else:
+                current += c
+        elif c == " " and not in_quote:
+            if current:
+                result.append(current)
+                current = ""
+        else:
+            current += c
+
+    if current:
+        result.append(current)
+
+    return result
 
 def parse_input(command):
-    input_arr = command.split(" ")
+    input_arr = split_input(command)
+
+    target = ""
 
     cli_input = input_arr[0]
+    for data in input_arr:
+        if data and (data[0] == "/" or data[0] == "\\") :
+            target = Path(data)
+
+        
     # for n in input_arr:
     #     print(n, end="|")
     # os.getcwd()       # membaca direktori aktif
@@ -22,6 +58,16 @@ def parse_input(command):
         case "exit":
             print("Leaving Shell....")
             return False
+        
+        case "help":
+            print("Commands:")
+            print("- help")
+            print("- exit")
+            print("- cd <dir>")
+            print("- cp <origin_dir> <destination>")
+            print("- pwd")
+            print("- ls")
+            return True
         
         case "cp":
             for n in input_arr:
@@ -38,7 +84,19 @@ def parse_input(command):
             return True
 
         case "cd":
-            os.chdir(input_arr[1])
+            if len(input_arr) < 2:
+                print("cd: missing directory")
+                return True
+
+            target = Path(input_arr[1])
+
+            if not target.exists():
+                print("cd: not found")
+            elif not target.is_dir():
+                print("cd: not a directory")
+            else:
+                os.chdir(target)
+
             return True
         
         case "pwd":
@@ -46,24 +104,19 @@ def parse_input(command):
             return True
         
         case _:
-            print('Unknown command. Use "help" to list usable commands.')
+            print(f'{cli_input} : Unknown command. Use "help" to list usable commands.')
             return True
 
 while True:
-    print(Style.BRIGHT + Fore.YELLOW + "user@myshell:~$ ", end="")
-    command = input()
+    try:
+        print(Style.BRIGHT + Fore.YELLOW + "user@myshell:~$ ", end="")
+        command = input()
 
-    if command.strip() == "":
-        continue
-
-    elif command == "help":
-        print("Available commands:")
-        print("- help")
-        print("- exit")
-
-
-    else:
-        next = parse_input(command)
-
-        if next is False:
+        if command.strip() == "":
+            continue
+       
+        if not parse_input(command):
             break
+
+    except KeyboardInterrupt:
+        print("\n(use 'exit' to quit)")
