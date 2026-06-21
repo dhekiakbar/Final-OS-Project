@@ -1,6 +1,5 @@
 import os
 from pathlib import Path
-import shlex
 from colorama import init, Fore, Back, Style
 
 # Initialize colorama (autoreset ensures colors reset after every print statement)
