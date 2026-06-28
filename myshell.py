@@ -1,9 +1,10 @@
 import os
+import subprocess
 from pathlib import Path
 from colorama import init, Fore, Back, Style
 
 init(autoreset=True)
-print(Fore.RED + "This text is red!")
+# print(Fore.RED + "This text is red!")
 
 def split_input(command):
     result = []
@@ -36,27 +37,28 @@ def split_input(command):
 def parse_input(command):
     input_arr = split_input(command)
 
-    target = ""
+    if not input_arr:
+        return True
 
     cli_input = input_arr[0]
-    for data in input_arr:
-        if data and (data[0] == "/" or data[0] == "\\") :
-            target = Path(data)
 
-        
     # for n in input_arr:
     #     print(n, end="|")
+
     # os.getcwd()       # membaca direktori aktif
     # os.chdir("folder") # mengganti direktori aktif shell Python
     # os.listdir(".")   # melihat isi folder
     # os.mkdir("test")  # membuat folder
-    # os.remove("a.txt") # menghapus file   
+    # os.remove("a.txt") # menghapus file
 
+    #update new
+    # os.fork() ditangani oleh subprocess.run()
+    
     match cli_input:
         case "exit":
             print("Leaving Shell....")
             return False
-        
+
         case "help":
             print("Commands:")
             print("- help")
@@ -65,45 +67,39 @@ def parse_input(command):
             print("- cp <origin_dir> <destination>")
             print("- pwd")
             print("- ls")
-            return True
-        
-        case "cp":
-            for n in input_arr:
-                print(n, end=" ")
-            return True
-        
-        case "ls": #todo : ubah ls jadi fork process
-            data = os.listdir(".")
-            for file in data :
-                if os.path.isdir(file):
-                    print(Style.BRIGHT + Fore.CYAN + file)
-                else :
-                    print(file)
+            print("- ls -la")
+            print("- mkdir")
+            print("- touch")
+            print("- rm")
+            print("- rm -r")
             return True
 
         case "cd":
             if len(input_arr) < 2:
-                print("cd: missing directory")
+                os.chdir(Path.home())
                 return True
-
             target = Path(input_arr[1])
-
             if not target.exists():
                 print("cd: not found")
             elif not target.is_dir():
                 print("cd: not a directory")
             else:
                 os.chdir(target)
-
             return True
-        
+
         case "pwd":
             print(Style.BRIGHT + Fore.GREEN + os.getcwd())
             return True
-        
+
         case _:
-            print(f'{cli_input} : Unknown command. Use "help" to list usable commands.')
+            try:
+                result = subprocess.run(input_arr)
+                if result.returncode != 0:
+                    print(f"{cli_input}: exited with code {result.returncode}")
+            except FileNotFoundError:
+                print(f'{cli_input}: command not found. Use "help" to list usable commands.')
             return True
+
 
 while True:
     try:
@@ -112,7 +108,7 @@ while True:
 
         if command.strip() == "":
             continue
-       
+
         if not parse_input(command):
             break
 
