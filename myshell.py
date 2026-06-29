@@ -1,22 +1,24 @@
 import os
+import shutil
+import subprocess
 from pathlib import Path
 from colorama import init, Fore, Style
 
-# ==========================================
+# =====================================================
 # INITIALIZATION
-# ==========================================
+# =====================================================
 
 init(autoreset=True)
 
-print(Fore.CYAN + "===================================")
-print(Fore.CYAN + "          MyShell v1.0             ")
-print(Fore.CYAN + "===================================")
-print(Fore.YELLOW + "Type 'help' to see available commands.\n")
+print(Fore.CYAN + "=" * 50)
+print(Fore.CYAN + "             MyShell v1.0")
+print(Fore.CYAN + "=" * 50)
+print(Fore.YELLOW + "Type 'help' to show available commands.\n")
 
 
-# ==========================================
+# =====================================================
 # INPUT TOKENIZER
-# ==========================================
+# =====================================================
 
 def split_input(command):
     result = []
@@ -54,16 +56,17 @@ def split_input(command):
     return result
 
 
-# ==========================================
+# =====================================================
 # HELP
-# ==========================================
+# =====================================================
 
 def show_help():
 
-    print(Style.BRIGHT + Fore.GREEN +
-          "\n=========== HELP ===========\n")
+    print(Style.BRIGHT + Fore.GREEN)
+    print("\n============== HELP MENU ==============\n")
 
-    print("BUILT-IN COMMANDS\n")
+    print(Fore.GREEN +"BUILT-IN COMMANDS")
+    print("")
 
     print("help")
     print("  Menampilkan seluruh command.\n")
@@ -78,9 +81,8 @@ def show_help():
     print("pwd")
     print("  Menampilkan direktori aktif.\n")
 
-    print("----------------------------------")
-
-    print("\nEXTERNAL COMMANDS\n")
+    print(Fore.GREEN + "EXTERNAL COMMANDS")
+    print("")
 
     print("ls")
     print("  Menampilkan isi direktori.\n")
@@ -89,22 +91,22 @@ def show_help():
     print("  Menampilkan seluruh file termasuk hidden file.\n")
 
     print("mkdir <folder>")
-    print("  Membuat direktori baru.\n")
+    print("  Membuat folder baru.\n")
 
     print("touch <file>")
     print("  Membuat file kosong.\n")
 
     print("cp <source> <destination>")
-    print("  Menyalin file.\n")
+    print("  Menyalin file atau folder.\n")
 
     print("mv <source> <destination>")
-    print("  Memindahkan file.\n")
+    print("  Memindahkan file/folder.\n")
 
     print("rm <file>")
     print("  Menghapus file.\n")
 
     print("rm -r <folder>")
-    print("  Menghapus direktori beserta isinya.\n")
+    print("  Menghapus folder beserta isinya.\n")
 
     print("clear")
     print("  Membersihkan layar terminal.\n")
@@ -113,11 +115,10 @@ def show_help():
     print("  Menampilkan isi file.\n")
 
     print("nano <file>")
-    print("  Mengedit file menggunakan nano.\n")
+    print("  Membuka file menggunakan Notepad.\n")
 
-    print("----------------------------------")
-
-    print("\nADVANCED FEATURES\n")
+    print(Fore.GREEN + "ADVANCED FEATURES")
+    print("")
 
     print("command > file")
     print("  Redirect output ke file.")
@@ -130,150 +131,139 @@ def show_help():
     print("command1 | command2")
     print("  Menghubungkan output command pertama")
     print("  menjadi input command kedua.")
-    print("  Contoh: ls | grep txt\n")
+    print("  Contoh: ls | help\n")
 
 
-# ==========================================
+# =====================================================
+# WINDOWS COMMAND TRANSLATOR
+# =====================================================
+
+def translate_command(args):
+
+    if len(args) == 0:
+        return args
+
+    cmd = args[0]
+
+    # ls
+    if cmd == "ls":
+
+        if len(args) > 1 and args[1] == "-la":
+            return ["cmd", "/c", "dir", "/a"]
+
+        return ["cmd", "/c", "dir"]
+
+    # clear
+    elif cmd == "clear":
+        return ["cmd", "/c", "cls"]
+
+    # nano
+    elif cmd == "nano":
+        return ["notepad"] + args[1:]
+
+    return args
+
+
+# =====================================================
 # EXTERNAL COMMAND
-# fork + execvp + waitpid
-# ==========================================
+# =====================================================
 
 def execute_external(args):
 
-    pid = os.fork()
+    args = translate_command(args)
 
-    # CHILD PROCESS
-    if pid == 0:
+    try:
+        subprocess.run(args)
 
-        try:
-            os.execvp(args[0], args)
+    except FileNotFoundError:
+        print(Fore.RED + f"{args[0]}: command not found")
 
-        except FileNotFoundError:
-            print(f"{args[0]}: Command not found")
-
-        except Exception as e:
-            print("Execution Error:", e)
-
-        os._exit(1)
-
-    # PARENT PROCESS
-    else:
-        os.waitpid(pid, 0)
+    except Exception as e:
+        print(Fore.RED + str(e))
 
 
-# ==========================================
-# REDIRECTION
-# ==========================================
+# =====================================================
+# OUTPUT / INPUT REDIRECTION
+# =====================================================
 
 def execute_redirection(args):
 
+    # OUTPUT >
     if ">" in args:
 
-        index = args.index(">")
+        idx = args.index(">")
 
-        command = args[:index]
-        filename = args[index + 1]
+        command = translate_command(args[:idx])
+        filename = args[idx + 1]
 
-        pid = os.fork()
+        try:
+            with open(filename, "w", encoding="utf-8") as f:
+                subprocess.run(command, stdout=f)
 
-        if pid == 0:
-
-            fd = os.open(
-                filename,
-                os.O_WRONLY |
-                os.O_CREAT |
-                os.O_TRUNC,
-                0o644
-            )
-
-            os.dup2(fd, 1)
-            os.close(fd)
-
-            os.execvp(command[0], command)
-
-        else:
-            os.waitpid(pid, 0)
+        except Exception as e:
+            print(Fore.RED + str(e))
 
         return True
 
+    # INPUT <
     elif "<" in args:
 
-        index = args.index("<")
+        idx = args.index("<")
 
-        command = args[:index]
-        filename = args[index + 1]
+        command = translate_command(args[:idx])
+        filename = args[idx + 1]
 
-        pid = os.fork()
+        try:
+            with open(filename, "r", encoding="utf-8") as f:
+                subprocess.run(command, stdin=f)
 
-        if pid == 0:
-
-            fd = os.open(filename, os.O_RDONLY)
-
-            os.dup2(fd, 0)
-            os.close(fd)
-
-            os.execvp(command[0], command)
-
-        else:
-            os.waitpid(pid, 0)
+        except Exception as e:
+            print(Fore.RED + str(e))
 
         return True
 
     return False
 
 
-# ==========================================
+# =====================================================
 # PIPE
-# ==========================================
+# =====================================================
 
 def execute_pipe(args):
 
     if "|" not in args:
         return False
 
-    index = args.index("|")
+    idx = args.index("|")
 
-    cmd1 = args[:index]
-    cmd2 = args[index + 1:]
+    cmd1 = translate_command(args[:idx])
+    cmd2 = translate_command(args[idx + 1:])
 
-    read_fd, write_fd = os.pipe()
+    try:
 
-    pid1 = os.fork()
+        p1 = subprocess.Popen(
+            cmd1,
+            stdout=subprocess.PIPE,
+            text=True
+        )
 
-    # CHILD 1
-    if pid1 == 0:
+        p2 = subprocess.Popen(
+            cmd2,
+            stdin=p1.stdout
+        )
 
-        os.dup2(write_fd, 1)
+        p1.stdout.close()
+        p2.communicate()
 
-        os.close(read_fd)
-        os.close(write_fd)
-
-        os.execvp(cmd1[0], cmd1)
-
-    pid2 = os.fork()
-
-    # CHILD 2
-    if pid2 == 0:
-
-        os.dup2(read_fd, 0)
-
-        os.close(read_fd)
-        os.close(write_fd)
-
-        os.execvp(cmd2[0], cmd2)
-
-    os.close(read_fd)
-    os.close(write_fd)
-
-    os.waitpid(pid1, 0)
-    os.waitpid(pid2, 0)
+    except Exception as e:
+        print(Fore.RED + str(e))
 
     return True
 
 
-# ==========================================
+# =====================================================
 # PARSER
-# ==========================================
+# =====================================================
 
 def parse_input(command):
 
@@ -284,79 +274,178 @@ def parse_input(command):
 
     cmd = args[0]
 
-    match cmd:
+    # =============================================
+    # BUILT-IN COMMANDS
+    # =============================================
 
-        # =====================
-        # EXIT
-        # =====================
-        case "exit":
-            print(Fore.RED + "Leaving shell...")
-            return False
+    if cmd == "exit":
+        print(Fore.RED + "Leaving Shell...")
+        return False
 
-        # =====================
-        # HELP
-        # =====================
-        case "help":
-            show_help()
+    elif cmd == "help":
+        show_help()
+        return True
+
+    elif cmd == "pwd":
+        print(
+            Style.BRIGHT +
+            Fore.GREEN +
+            os.getcwd()
+        )
+        return True
+
+    elif cmd == "cd":
+
+        # cd tanpa argumen -> home
+        if len(args) == 1:
+            os.chdir(Path.home())
             return True
 
-        # =====================
-        # CD
-        # =====================
-        case "cd":
+        target = Path(args[1])
 
-            # cd tanpa argumen -> HOME
-            if len(args) == 1:
+        if not target.exists():
+            print(Fore.RED + "cd: directory not found")
 
-                os.chdir(Path.home())
-                return True
+        elif not target.is_dir():
+            print(Fore.RED + "cd: not a directory")
 
-            try:
-                os.chdir(args[1])
+        else:
+            os.chdir(target)
 
-            except FileNotFoundError:
-                print("cd: no such directory")
+        return True
 
-            except NotADirectoryError:
-                print("cd: not a directory")
+    # =============================================
+    # CP
+    # =============================================
 
+    elif cmd == "cp":
+
+        if len(args) < 3:
+            print("Usage: cp <source> <destination>")
             return True
 
-        # =====================
-        # PWD
-        # =====================
-        case "pwd":
+        source = args[1]
+        destination = args[2]
 
-            print(
-                Style.BRIGHT +
-                Fore.GREEN +
-                os.getcwd()
-            )
+        try:
 
+            if os.path.isdir(source):
+                shutil.copytree(source, destination)
+
+            else:
+                shutil.copy2(source, destination)
+
+        except Exception as e:
+            print(Fore.RED + str(e))
+
+        return True
+
+    # =============================================
+    # TOUCH
+    # =============================================
+
+    elif cmd == "touch":
+
+        if len(args) < 2:
+            print("Usage: touch <filename>")
             return True
 
-        # =====================
-        # EXTERNAL COMMAND
-        # =====================
-        case _:
+        try:
+            Path(args[1]).touch()
 
-            # PIPE
-            if execute_pipe(args):
-                return True
+        except Exception as e:
+            print(Fore.RED + str(e))
 
-            # REDIRECTION
-            if execute_redirection(args):
-                return True
+        return True
 
-            # NORMAL COMMAND
-            execute_external(args)
+    # =============================================
+    # RM
+    # =============================================
 
+    elif cmd == "rm":
+
+        if len(args) < 2:
+            print("Usage: rm <file>")
             return True
 
+        try:
 
-# ==========================================
-# MAIN REPL LOOP
-# ==========================================
+            if args[1] == "-r":
+
+                if len(args) < 3:
+                    print("Usage: rm -r <folder>")
+                    return True
+
+                shutil.rmtree(args[2])
+
+            else:
+                os.remove(args[1])
+
+        except Exception as e:
+            print(Fore.RED + str(e))
+
+        return True
+
+    # =============================================
+    # CAT
+    # =============================================
+
+    elif cmd == "cat":
+
+        if len(args) < 2:
+            print("Usage: cat <file>")
+            return True
+
+        try:
+
+            with open(args[1], "r", encoding="utf-8") as f:
+                print(f.read())
+
+        except Exception as e:
+            print(Fore.RED + str(e))
+
+        return True
+
+    # =============================================
+    # MV
+    # =============================================
+
+    elif cmd == "mv":
+
+        if len(args) < 3:
+            print("Usage: mv <source> <destination>")
+            return True
+
+        try:
+            shutil.move(args[1], args[2])
+
+        except Exception as e:
+            print(Fore.RED + str(e))
+
+        return True
+
+    # =============================================
+    # ADVANCED FEATURES
+    # =============================================
+
+    if execute_pipe(args):
+        return True
+
+    if execute_redirection(args):
+        return True
+
+    # =============================================
+    # EXTERNAL COMMAND
+    # =============================================
+
+    execute_external(args)
+
+    return True
+
+
+# =====================================================
+# MAIN LOOP (REPL)
+# =====================================================
 
 while True:
 
@@ -373,7 +462,6 @@ while True:
 
         command = input()
 
-        # kosong
         if command.strip() == "":
             continue
 
@@ -381,7 +469,7 @@ while True:
             break
 
     except KeyboardInterrupt:
-        print("\n(use 'exit' to quit)")
+        print(Fore.RED + "\n(use 'exit' to quit)")
 
     except EOFError:
         print()
